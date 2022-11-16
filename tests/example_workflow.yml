@@ -1,0 +1,25 @@
+name: My Great Workflow
+trigger:
+  foo: barJob
+jobs:
+  barJob:
+    steps:
+      - uses: markhuot\workflow\fetchers\Raw
+        output: source
+        with:
+          data:
+            - firstName: Michael
+              lastName: Bluth
+            - firstName: Lindsey
+              lastName: Bluth
+            - firstName: Gob
+              lastName: Bluth
+            - firstName: Buster
+              lastName: Bluth
+      - uses: markhuot\workflow\mutations\Map
+        output: source
+        with:
+          items: source
+          map:
+            first_name: item['firstName']
+            last_name: item['lastName']
