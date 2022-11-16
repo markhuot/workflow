@@ -1,0 +1,62 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+.w-screen { width: 100vw; }
+.h-screen { height: 100vh; }
+
+.react-flow {
+    font-family: system-ui;
+}
+
+.react-flow__node {
+    border-radius: 5px;
+    width: 350px;
+    border: 1px solid #ccc;
+    background: #fff;
+    box-shadow: 0 1px 0 #999, 0 3px 4px rgba(0,0,0,0.2);
+}
+
+.workflow-node-label {
+    font-size: 14px;
+    font-weight: bold;
+    color: #666;
+    border-bottom: 1px solid #ccc;
+    padding: 6px 10px;
+    border-radius: 5px 5px 0 0;
+}
+
+.workflow-node-label.fetchers {
+    background: linear-gradient(#5b854b, #334d2a);
+    color: #fff;
+}
+
+.workflow-node-label.mutations {
+    background: linear-gradient(#939a55, #6b703d);
+    color: #fff;
+}
+
+.workflow-contents {
+    padding: 10px;
+}
+
+.workflow-label {
+    font-weight: bold;
+    color: #222;
+    margin-bottom: 4px;
+    display: block;
+}
+
+.workflow-input {
+    width: 100%;
+    border-radius: 5px;
+    border: 2px solid #ccc;
+    padding: 6px 10px;
+    font-size: 16px;
+}
+
+.workflow-space-y > * + * {
+    margin-top: 10px;
+}
