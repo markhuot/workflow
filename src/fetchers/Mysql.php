@@ -2,14 +2,27 @@
 
 namespace markhuot\workflow\fetchers;
 
+use markhuot\workflow\exceptions\PaginationCompleteException;
 use markhuot\workflow\Step;
 
-function generated($callback, $paginate=false, $perPage=10)
+function generated($callback, $perPage=null, $limit=null, $offset=null)
 {
-    $offset = 0;
+    $perPageOffset = 0;
 
     while (true) {
-        $rows = $callback($paginate ? 'limit ' . $perPage . ' offset '.$offset : '');
+        $suffix = '';
+        if ($perPage) {
+            $suffix = 'limit ' . $perPage . ' offset '.$perPageOffset;
+        }
+        if ($limit) {
+            $suffix = 'limit ' . $limit . ' offset '.$offset;
+        }
+        $rows = $callback($suffix);
+
+        if ($limit !== null && $offset !== null && empty($rows)) {
+            throw new PaginationCompleteException;
+        }
+
         if (empty($rows)) {
             break;
         }
@@ -18,8 +31,8 @@ function generated($callback, $paginate=false, $perPage=10)
             yield $row;
         }
 
-        if ($paginate) {
-            $offset += $perPage;
+        if ($perPage) {
+            $perPageOffset += $perPage;
         }
         else {
             break;
@@ -29,7 +42,8 @@ function generated($callback, $paginate=false, $perPage=10)
 
 class Mysql extends Step
 {
-    protected \Generator $result;
+    protected ?\PDO $connection;
+    protected \Generator|array|null $result;
 
     function __construct(
         protected string $dsn,
@@ -37,21 +51,32 @@ class Mysql extends Step
         protected ?string $password,
         protected string $query,
         protected array $options=[],
-        protected bool $paginate=false,
-        protected int $perPage=100,
+        protected ?int $perPage=null,
+        protected ?int $limit=null,
     ) {}
 
     function run()
     {
-        $connection = new \PDO($this->dsn, $this->username, $this->password, $this->options);
-        $this->result = generated(function ($suffix) use ($connection) {
-            // echo "Running: ".$this->query.' '.$suffix."\n";
-            return $connection->query($this->query.' '.$suffix)->fetchAll(\PDO::FETCH_ASSOC);
-        }, paginate: $this->paginate, perPage: $this->perPage);
+        $limit = $this->limit ?? $this->getJob()->getPagination()['perPage'] ?? null;
+        $offset = $this->getJob()->getPagination()['offset'] ?? null;
+
+        $this->connection = new \PDO($this->dsn, $this->username, $this->password, $this->options);
+        $this->result = generated(function ($suffix) {
+            //echo "Running: ".$this->query.' '.$suffix."\n";
+            return $this->connection->query($this->query.' '.$suffix)->fetchAll(\PDO::FETCH_ASSOC);
+        }, perPage: $this->perPage, limit: $limit, offset: $offset);
     }
 
     function getOutput()
     {
         return $this->result;
+    }
+
+    function finish()
+    {
+        // canonize the current generator in to the result so it can persist after the connection
+        // is closed
+        $this->result = $this->result->current();
+        $this->connection = null;
     }
 }

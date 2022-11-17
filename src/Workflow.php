@@ -28,6 +28,13 @@ class Workflow
         return $this;
     }
 
+    function clearOutputs()
+    {
+        $this->output = [];
+
+        return $this;
+    }
+
     function getOutputs()
     {
         return $this->output;

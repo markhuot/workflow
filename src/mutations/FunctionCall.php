@@ -14,12 +14,20 @@ class FunctionCall extends Step
 
     function __construct(
         protected string $function,
-        protected string $value,
+        protected mixed $value,
+        protected ?array $args=null,
     ) {}
 
     function run() {
         $function = $this->function;
-        $this->value = $function($this->value);
+        if (!empty($this->args)) {
+            foreach ($this->args as $arg) {
+
+            }
+        }
+        else {
+            $this->value = $function($this->value);
+        }
     }
 
     function getOutput()

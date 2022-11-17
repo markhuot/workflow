@@ -17,30 +17,45 @@ class Map extends Step
 
     function __construct(
         protected iterable $items,
-        protected array|string $map,
+        protected array|string|null $map=null,
     ) {}
 
     function run()
     {
-        $this->items = collect($this->items)
-            ->map(function ($item) {
-                if (is_string($this->map)) {
-                    return (new ExpressionLanguage())->evaluate($this->map, ['item' => $item]);
+        $mappedItems = [];
+
+        foreach ($this->items as $key => $item) {
+            if (is_string($this->map)) {
+                $mappedItems[$key] = (new ExpressionLanguage())->evaluate($this->map, ['item' => $item]);
+            }
+
+            else if (isset($this->map[0])) {
+                $mappedItems[$key] = (new Workflow([
+                    'env' => ['item' => $item],
+                    'jobs' => [
+                        'default' => [
+                            'steps' => $this->map
+                        ],
+                    ]]))
+                    ->runJob('default')
+                    ->getOutput('$?');
+            }
+
+            else if (is_array($this->map)) {
+                foreach ($this->map as $subKey => $transformer) {
+                    if (is_string($transformer)) {
+                        $mappedItems[$key][$subKey] = (new ExpressionLanguage())->evaluate($transformer, ['item' => $item]);
+                        continue;
+                    }
+
+                    $mappedItems[$key][$subKey] = (new Workflow(['env' => ['item' => $item], 'jobs' => ['default' => ['steps' => $transformer]]]))
+                        ->runJob('default')
+                        ->getOutput('$?');
                 }
-
-                return collect($this->map)
-                    ->map(function ($transformer) use ($item) {
-                        if (is_string($transformer)) {
-                            return (new ExpressionLanguage())->evaluate($transformer, ['item' => $item]);
-                        }
-
-                        return (new Workflow(['env' => ['item' => $item], 'jobs' => ['default' => ['steps' => $transformer]]]))
-                            ->runJob('default')
-                            ->getOutput('$?');
-                    })
-                    ->toArray();
-            })
-            ->toArray();
+            }
+        }
+        
+        $this->items = $mappedItems;
     }
 
     function getOutput()

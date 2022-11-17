@@ -2,8 +2,13 @@
 
 namespace markhuot\workflow;
 
+use markhuot\workflow\exceptions\PaginationCompleteException;
+
 class Job
 {
+    protected int $offset = 0;
+    protected array $pagedOutput = [];
+
     /**
      * @param array{
      *   steps: array{
@@ -46,14 +51,58 @@ class Job
         );
     }
 
+    /**
+     * @return array{
+     *     perPage: int,
+     *     offset: int,
+     * }|null
+     */
+    function getPagination()
+    {
+        if (empty($this->definition['paginate'])) {
+            return null;
+        }
+
+        return array_merge([
+            'perPage' => 100,
+        ], $this->definition['paginate'], [
+            'offset' => $this->offset,
+            'output' => $this->pagedOutput,
+        ]);
+    }
+
     function run()
     {
-        foreach ($this->definition['steps'] as $definition) {
-            $uses = $definition['uses'];
+        while (true) {
+            try {
+                $this->runSteps();
+            }
+            catch (PaginationCompleteException $e) {
+                break;
+            }
 
+            if ($this->getPagination()) {
+                $this->pagedOutput[] = $this->workflow->getOutputs();
+                $this->workflow->clearOutputs();
+                $this->offset += $this->getPagination()['perPage'];
+            }
+            else {
+                break;
+            }
+        }
+
+        return $this;
+    }
+
+    protected function runSteps()
+    {
+        $steps = [];
+
+        foreach ($this->definition['steps'] as $definition) {
+            $uses = $definition['uses'] ?? null;
             $with = $definition['with'] ?? [];
 
-            if ($uses::$casts) {
+            if ($uses && $uses::$casts) {
                 foreach ($uses::$casts as $key => $casts) {
                     if (!is_array($casts)) {
                         $casts = [$casts];
@@ -64,17 +113,43 @@ class Job
                 }
             }
 
-            $step = (new $uses(...($with)));
-            $step->run();
+            if ($uses) {
+                $step = (new $uses(...($with)));
+                $step->setJob($this);
+                $step->run();
+                $steps[] = $step;
 
-            if ($output = ($definition['output'] ?? false)) {
-                $this->workflow->setOutput($output, $step->getOutput());
+                if ($output = ($definition['output'] ?? false)) {
+                    $this->workflow->setOutput($output, $step->getOutput());
+                }
+                else {
+                    $this->workflow->setOutput('$?', $step->getOutput());
+                }
             }
-            else {
-                $this->workflow->setOutput('$?', $step->getOutput());
+
+            if ($definition['run'] ?? false) {
+                (function ($args) use ($definition) {
+                    $variables = $this->getVariables();
+                    extract($variables, EXTR_OVERWRITE);
+                    extract($args, EXTR_OVERWRITE);
+                    $argv[1] = $variables['$?'] ?? null;
+                    $run = $definition['run'];
+                    $isSingleLine = preg_match('/[\r\n]+/', $run) === 0;
+                    if ($isSingleLine) {
+                        $result = eval('return '.$run.';');
+                    }
+                    else {
+                        $result = eval($run);
+                    }
+                    if ($result !== null) {
+                        $this->workflow->setOutput('$?', $result);
+                    }
+                })($with);
             }
         }
 
-        return $this;
+        foreach ($steps as $step)  {
+            $step->finish();
+        }
     }
 }

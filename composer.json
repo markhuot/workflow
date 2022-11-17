@@ -7,12 +7,13 @@
         }
     ],
     "require": {
+        "ext-pdo": "*",
         "pestphp/pest": "^1.22",
         "symfony/yaml": "^6.0",
         "symfony/expression-language": "^6.0",
         "illuminate/collections": "^9.40",
         "symfony/dom-crawler": "^6.0",
-        "symfony/css-selector": "^6.0"
+        "symfony/css-selector": "^6.0",
     },
     "autoload": {
         "psr-4": {
